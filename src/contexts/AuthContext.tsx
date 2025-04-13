@@ -1,7 +1,12 @@
-import React, { createContext, useContext, useState, ReactNode, useEffect } from "react";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  ReactNode,
+} from "react";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "../supabaseClient";
-
+import { supabase } from "@/supabaseClient";
 
 type User = {
   id: string;
@@ -38,27 +43,34 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
-  // Fetch user session and user data on mount
   useEffect(() => {
     const getUserData = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        const { data, error } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", session.user.id)
-          .single();
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
 
-        if (data) {
+        if (session?.user) {
+          const { data: profile, error } = await supabase
+            .from("profiles")
+            .select("*")
+            .eq("id", session.user.id)
+            .single();
+
+          if (error) throw error;
+
           setCurrentUser({
             id: session.user.id,
             email: session.user.email!,
-            name: data.name,
-            goals: data.goals,
+            name: profile.name,
+            goals: profile.goals,
           });
         }
+      } catch (err: any) {
+        console.error("Session load error:", err.message);
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     };
 
     getUserData();
@@ -66,26 +78,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const login = async (email: string, password: string) => {
     setIsLoading(true);
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-
-    if (error || !data.session) {
-      toast({
-        title: "Login failed",
-        description: error?.message || "Invalid credentials",
-        variant: "destructive",
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
       });
-      setIsLoading(false);
-      return false;
-    }
 
-    const userId = data.session.user.id;
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", userId)
-      .single();
+      if (error) throw new Error(error.message);
+      if (!data.session) throw new Error("No session returned");
 
-    if (profile) {
+      const userId = data.session.user.id;
+
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", userId)
+        .single();
+
+      if (profileError) throw new Error(profileError.message);
+
       setCurrentUser({
         id: userId,
         email: data.session.user.email!,
@@ -99,113 +110,117 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
 
       return true;
+    } catch (error: any) {
+      console.error("Login error:", error.message);
+      toast({
+        title: "Login failed",
+        description: error.message || "Something went wrong.",
+        variant: "destructive",
+      });
+      return false;
+    } finally {
+      setIsLoading(false);
     }
-
-    toast({
-      title: "Login failed",
-      description: profileError?.message || "Unable to fetch profile",
-      variant: "destructive",
-    });
-
-    setIsLoading(false);
-    return false;
   };
 
   const signup = async (name: string, email: string, password: string) => {
     setIsLoading(true);
-
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-    });
-
-    if (error || !data.user) {
-      toast({
-        title: "Signup failed",
-        description: error?.message || "Unable to create account",
-        variant: "destructive",
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
       });
-      setIsLoading(false);
-      return false;
-    }
 
-    // Add extra user data
-    const user = data.user;
-    const defaultGoals = {
-      calories: 2000,
-      protein: 120,
-      carbs: 250,
-      sugar: 50,
-      fat: 70,
-    };
+      if (error) throw new Error(error.message);
+      if (!data.user) throw new Error("Signup failed");
 
-    const { error: insertError } = await supabase
-      .from("profiles")
-      .insert([
+      const defaultGoals = {
+        calories: 2000,
+        protein: 120,
+        carbs: 250,
+        sugar: 50,
+        fat: 70,
+      };
+
+      const { error: insertError } = await supabase.from("profiles").insert([
         {
-          id: user.id,
+          id: data.user.id,
           name,
           goals: defaultGoals,
         },
       ]);
 
-    if (insertError) {
+      if (insertError) throw new Error(insertError.message);
+
+      setCurrentUser({
+        id: data.user.id,
+        email,
+        name,
+        goals: defaultGoals,
+      });
+
       toast({
-        title: "Profile creation failed",
-        description: insertError.message,
+        title: "Signup successful!",
+        description: `Welcome to Calovate, ${name}!`,
+      });
+
+      return true;
+    } catch (error: any) {
+      console.error("Signup error:", error.message);
+      toast({
+        title: "Signup failed",
+        description: error.message || "Something went wrong.",
         variant: "destructive",
       });
-      setIsLoading(false);
       return false;
+    } finally {
+      setIsLoading(false);
     }
-
-    setCurrentUser({
-      id: user.id,
-      email,
-      name,
-      goals: defaultGoals,
-    });
-
-    toast({
-      title: "Account created!",
-      description: `Welcome to Calovate, ${name}!`,
-    });
-
-    return true;
   };
 
   const logout = async () => {
-    await supabase.auth.signOut();
-    setCurrentUser(null);
-    toast({
-      title: "Logged out",
-      description: "You have been successfully logged out.",
-    });
+    try {
+      await supabase.auth.signOut();
+      setCurrentUser(null);
+      toast({
+        title: "Logged out",
+        description: "You have been successfully logged out.",
+      });
+    } catch (error: any) {
+      console.error("Logout error:", error.message);
+      toast({
+        title: "Logout failed",
+        description: error.message || "Something went wrong.",
+        variant: "destructive",
+      });
+    }
   };
 
   const updateUserGoals = async (goals: User["goals"]) => {
     if (!currentUser) return;
 
-    const { error } = await supabase
-      .from("profiles")
-      .update({ goals })
-      .eq("id", currentUser.id);
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ goals })
+        .eq("id", currentUser.id);
 
-    if (error) {
+      if (error) throw new Error(error.message);
+
+      setCurrentUser({ ...currentUser, goals });
+
+      toast({
+        title: "Goals updated!",
+        description: "Your nutrition goals have been updated.",
+      });
+    } catch (error: any) {
+      console.error("Goal update error:", error.message);
       toast({
         title: "Update failed",
-        description: error.message,
+        description: error.message || "Something went wrong.",
         variant: "destructive",
       });
-      return;
     }
-
-    setCurrentUser({ ...currentUser, goals });
-
-    toast({
-      title: "Goals updated!",
-      description: "Your nutrition goals have been updated.",
-    });
   };
 
   const value: AuthContextType = {
@@ -217,5 +232,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     isLoading,
   };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={value}>
+      {!isLoading && children}
+    </AuthContext.Provider>
+  );
 };
