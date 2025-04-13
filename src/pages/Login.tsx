@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -16,7 +15,7 @@ const Login = () => {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { login } = useAuth();
+  const { login } = useAuth(); // This will call the login method from AuthContext
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -31,7 +30,7 @@ const Login = () => {
       });
       return;
     }
-    
+
     setIsSubmitting(true);
     try {
       const success = await login(email, password);
@@ -50,9 +49,9 @@ const Login = () => {
       <main className="flex-grow flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-calovate-neutral/30">
         <Card className="w-full max-w-md">
           <CardHeader>
-            <CardTitle className="text-2xl text-center">Welcome Back</CardTitle>
+            <CardTitle className="text-2xl text-center">Sign In</CardTitle>
             <CardDescription className="text-center">
-              Sign in to your account to continue
+              Login to continue your journey
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -69,12 +68,7 @@ const Login = () => {
                 />
               </div>
               <div className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="password">Password</Label>
-                  <Link to="#" className="text-xs text-calovate-primary hover:underline">
-                    Forgot password?
-                  </Link>
-                </div>
+                <Label htmlFor="password">Password</Label>
                 <div className="relative">
                   <Input
                     id="password"
@@ -100,23 +94,6 @@ const Login = () => {
               >
                 {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                 Sign In
-              </Button>
-              
-              {/* Demo login button */}
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full"
-                onClick={() => {
-                  setEmail("demo@example.com");
-                  setPassword("password");
-                  toast({
-                    title: "Demo credentials loaded",
-                    description: "Click Sign In to login with the demo account",
-                  });
-                }}
-              >
-                Use Demo Account
               </Button>
             </form>
           </CardContent>
