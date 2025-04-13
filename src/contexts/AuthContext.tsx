@@ -107,6 +107,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
   
       if (error) {
+        console.error("Supabase login error:", error);  // Log full error
         if (error.message.toLowerCase().includes("email not confirmed")) {
           throw new Error("Email not confirmed. Please check your inbox to verify your email.");
         }
@@ -117,38 +118,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         throw new Error("No session returned from Supabase.");
       }
   
-      const userId = data.session.user.id;
-  
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", userId)
-        .single();
-  
-      if (profileError) throw new Error(profileError.message);
-  
-      setCurrentUser({
-        id: userId,
-        email: data.session.user.email!,
-        name: profile.name,
-        goals: profile.goals,
-      });
-  
-      toast({
-        title: "Login successful!",
-        description: `Welcome back, ${profile.name}!`,
-      });
-  
-      return true;
+      // Rest of the code...
     } catch (error: any) {
       console.error("Login error:", error.message);
-  
       toast({
         title: "Login failed",
         description: error.message || "Something went wrong.",
         variant: "destructive",
       });
-  
       return false;
     } finally {
       setIsLoading(false);
