@@ -27,8 +27,10 @@ interface AuthContextType {
   signup: (name: string, email: string, password: string) => Promise<boolean>;
   logout: () => Promise<void>;
   updateUserGoals: (goals: User["goals"]) => Promise<void>;
+  resendConfirmationEmail: (email: string) => Promise<void>; // ← Add this
   isLoading: boolean;
 }
+
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -76,6 +78,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     getUserData();
   }, []);
 
+  const resendConfirmationEmail = async (email: string) => {
+    const { error } = await supabase.auth.resend({
+      type: "signup",
+      email,
+    });
+  
+    if (error) {
+      toast({
+        title: "Resend failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Confirmation sent",
+        description: "Check your email for the confirmation link.",
+      });
+    }
+  };
+  
   const login = async (email: string, password: string) => {
     setIsLoading(true);
     try {
@@ -83,46 +105,56 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         email,
         password,
       });
-
-      if (error) throw new Error(error.message);
-      if (!data.session) throw new Error("No session returned");
-
+  
+      if (error) {
+        if (error.message.toLowerCase().includes("email not confirmed")) {
+          throw new Error("Email not confirmed. Please check your inbox to verify your email.");
+        }
+        throw new Error(error.message);
+      }
+  
+      if (!data.session) {
+        throw new Error("No session returned from Supabase.");
+      }
+  
       const userId = data.session.user.id;
-
+  
       const { data: profile, error: profileError } = await supabase
         .from("profiles")
         .select("*")
         .eq("id", userId)
         .single();
-
+  
       if (profileError) throw new Error(profileError.message);
-
+  
       setCurrentUser({
         id: userId,
         email: data.session.user.email!,
         name: profile.name,
         goals: profile.goals,
       });
-
+  
       toast({
         title: "Login successful!",
         description: `Welcome back, ${profile.name}!`,
       });
-
+  
       return true;
     } catch (error: any) {
       console.error("Login error:", error.message);
+  
       toast({
         title: "Login failed",
         description: error.message || "Something went wrong.",
         variant: "destructive",
       });
+  
       return false;
     } finally {
       setIsLoading(false);
     }
   };
-
+  
   const signup = async (name: string, email: string, password: string) => {
     setIsLoading(true);
     try {
@@ -222,15 +254,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
     }
   };
-
   const value: AuthContextType = {
     currentUser,
     login,
     signup,
     logout,
     updateUserGoals,
+    resendConfirmationEmail, // ← Add this line
     isLoading,
   };
+  
+  // Removed duplicate declaration of value
 
   return (
     <AuthContext.Provider value={value}>

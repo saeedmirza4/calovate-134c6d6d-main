@@ -15,13 +15,14 @@ const Login = () => {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { login } = useAuth(); // This will call the login method from AuthContext
+  const [loginError, setLoginError] = useState<string | null>(null); // State for login errors
+  const { login, resendConfirmationEmail } = useAuth(); // Updated to use resendConfirmationEmail
   const { toast } = useToast();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!email || !password) {
       toast({
         title: "Error",
@@ -36,9 +37,17 @@ const Login = () => {
       const success = await login(email, password);
       if (success) {
         navigate("/dashboard");
+      } else {
+        setLoginError("login_failed"); // Handle login failure
       }
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleResendEmail = async () => {
+    if (email) {
+      await resendConfirmationEmail(email);
     }
   };
 
@@ -96,6 +105,17 @@ const Login = () => {
                 Sign In
               </Button>
             </form>
+            {/* Show the resend button if login fails */}
+            {loginError === "login_failed" && (
+              <div className="mt-4 text-center">
+                <button
+                  onClick={handleResendEmail}
+                  className="text-sm text-blue-600 underline"
+                >
+                  Resend confirmation email
+                </button>
+              </div>
+            )}
           </CardContent>
           <CardFooter className="flex justify-center">
             <p className="text-sm text-gray-600">
