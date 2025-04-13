@@ -105,20 +105,39 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         email,
         password,
       });
-  
+
       if (error) {
-        console.error("Supabase login error:", error);  // Log full error
-        if (error.message.toLowerCase().includes("email not confirmed")) {
-          throw new Error("Email not confirmed. Please check your inbox to verify your email.");
-        }
-        throw new Error(error.message);
+        toast({
+          title: "Login failed",
+          description: error.message,
+          variant: "destructive",
+        });
+        return false;
       }
-  
+
       if (!data.session) {
         throw new Error("No session returned from Supabase.");
       }
-  
-      // Rest of the code...
+
+      // Fetch user profile
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", data.session.user.id)
+        .single();
+
+      if (profileError) {
+        throw new Error(profileError.message);
+      }
+
+      setCurrentUser({
+        id: data.session.user.id,
+        email: data.session.user.email!,
+        name: profile.name,
+        goals: profile.goals,
+      });
+
+      return true;
     } catch (error: any) {
       console.error("Login error:", error.message);
       toast({
